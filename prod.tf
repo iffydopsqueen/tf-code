@@ -10,7 +10,22 @@ resource "aws_s3_bucket" "prod_tf_content" {
 
 resource "aws_default_vpc" "default_vpc" {}
 
-resource "aws_security_group" "prod_web" {
+# default subnets for ELB
+resource "aws_default_subnet" "default_az1" {
+    availability_zone = "us-west-2c"
+    tags = {
+        "Terraform" : "true"
+    }
+}
+
+resource "aws_default_subnet" "default_az2" {
+    availability_zone = "us-west-2d"
+    tags = {
+        "Terraform" : "true"
+    }
+}
+
+resource "aws_security_group" "prod_web_SG" {
     name        = "prod-web-SG"
     description = "Allow std http and https ports inbound and everything outbound"
 
@@ -51,7 +66,7 @@ resource "aws_instance" "prod_web_EC2" {
     instance_type = "t2.nano"
 
     vpc_security_group_ids = [ 
-        aws_security_group.prod_web.id 
+        aws_security_group.prod_web_SG.id 
     ]
 
     tags = {
@@ -67,6 +82,24 @@ resource "aws_eip_association" "prod_web_EIP_association" {
 
 resource "aws_eip" "prod_web_EIP" {
     instance = aws_instance.prod_web_EC2[0].id
+
+    tags = {
+        "Terraform" : "true"
+    }
+}
+
+resource "aws_elb" "prod_web_ELB" {
+    name            = "prod-web-ELB"
+    instances       = aws_instance.prod_web_EC2.*.id # for all the instances
+    subnets         = [ aws_default_subnet.default_az1.id, aws_default_subnet.default_az2.id ]
+    security_groups = [ aws_security_group.prod_web_SG.id ] # so that our instances & ELB can actually talk to each other & talk to the world
+
+    listener {
+      instance_port     = 80
+      instance_protocol = "http"
+      lb_port           = 80
+      lb_protocol       = "http"
+    }
 
     tags = {
         "Terraform" : "true"
