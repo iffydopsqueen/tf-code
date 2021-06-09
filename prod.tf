@@ -1,3 +1,22 @@
+variable "whitelist" {
+    type = list(string)
+}         
+variable "web_image_id" {
+    type = string
+}       
+variable "web_instance_type" {
+    type = string
+}    
+variable "web_desired_capacity" {
+    type = number
+} 
+variable "web_max_size" {
+    type = number
+}         
+variable "web_min_size" {
+    type = number
+}         
+
 provider "aws" {
     profile = "default"
     region  = "us-west-2"
@@ -35,7 +54,7 @@ resource "aws_security_group" "prod_web_SG" {
         from_port   = 80
         to_port     = 80
         protocol    = "tcp"
-        cidr_blocks = ["0.0.0.0/0"] # allows all IPs
+        cidr_blocks = var.whitelist # allows all IPs
     }
 
         ingress {
@@ -43,7 +62,7 @@ resource "aws_security_group" "prod_web_SG" {
         from_port   = 443
         to_port     = 443
         protocol    = "tcp"
-        cidr_blocks = ["0.0.0.0/0"] # allows all IPs
+        cidr_blocks = var.whitelist # allows all IPs
     }
 
     # Outbound rules
@@ -51,7 +70,7 @@ resource "aws_security_group" "prod_web_SG" {
         from_port   = 0 # no restrictions in port on tf
         to_port     = 0 # no restrictions in port on tf
         protocol    = "-1" # allows every protocols 
-        cidr_blocks = ["0.0.0.0/0"] # allows traffic to any IP
+        cidr_blocks = var.whitelist # allows traffic to any IP
     }
 
     tags = {
@@ -62,8 +81,8 @@ resource "aws_security_group" "prod_web_SG" {
 # Launch template for ASG
 resource "aws_launch_template" "prod_web_launch" {
     name          = "prod-web-launch"
-    image_id      = "ami-0235290bfade69c7c"
-    instance_type = "t2.nano"
+    image_id      = var.web_image_id
+    instance_type = var.web_instance_type
 
     tags = {
         "Terraform" : "true"
@@ -73,9 +92,9 @@ resource "aws_launch_template" "prod_web_launch" {
 # Auto-scaling group
 resource "aws_autoscaling_group" "prod_web_ASG" {
     # availability_zones = [ "us-west-2c", "us-west-2d"] # use this one or the vpc_zone_identifier
-    desired_capacity    = 2
-    max_size            = 3
-    min_size            = 2
+    desired_capacity    = var.web_desired_capacity
+    max_size            = var.web_max_size
+    min_size            = var.web_min_size
     vpc_zone_identifier = [ aws_default_subnet.default_az1.id, aws_default_subnet.default_az2.id ]
 
     launch_template {
