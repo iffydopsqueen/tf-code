@@ -59,38 +59,44 @@ resource "aws_security_group" "prod_web_SG" {
     }
 }
 
-resource "aws_instance" "prod_web_EC2" {
-    count = 2
-
-    ami           = "ami-0235290bfade69c7c"
+# Launch template for ASG
+resource "aws_launch_template" "prod_web_launch" {
+    name          = "prod-web-launch"
+    image_id      = "ami-0235290bfade69c7c"
     instance_type = "t2.nano"
 
-    vpc_security_group_ids = [ 
-        aws_security_group.prod_web_SG.id 
-    ]
-
     tags = {
         "Terraform" : "true"
     }
 }
 
-# to avoid EIP being dependent on instance creation - decoupling
-resource "aws_eip_association" "prod_web_EIP_association" {
-    instance_id   = aws_instance.prod_web_EC2[0].id # refers to the first instance
-    allocation_id = aws_eip.prod_web_EIP.id
+# Auto-scaling group
+resource "aws_autoscaling_group" "prod_web_ASG" {
+    # availability_zones = [ "us-west-2c", "us-west-2d"] # use this one or the vpc_zone_identifier
+    desired_capacity    = 2
+    max_size            = 3
+    min_size            = 2
+    vpc_zone_identifier = [ aws_default_subnet.default_az1.id, aws_default_subnet.default_az2.id ]
+
+    launch_template {
+      id      = aws_launch_template.prod_web_launch.id
+      version = "$Latest"
+    }
+    
+    tag {
+        key                 = "Terraform" 
+        value               = "true"
+        propagate_at_launch = true
+    }
 }
 
-resource "aws_eip" "prod_web_EIP" {
-    instance = aws_instance.prod_web_EC2[0].id
-
-    tags = {
-        "Terraform" : "true"
-    }
+resource "aws_autoscaling_attachment" "prod_web_ASG_attach" {
+  autoscaling_group_name = aws_autoscaling_group.prod_web_ASG.id
+  elb                    = aws_elb.prod_web_ELB.id
 }
 
 resource "aws_elb" "prod_web_ELB" {
     name            = "prod-web-ELB"
-    instances       = aws_instance.prod_web_EC2.*.id # for all the instances
     subnets         = [ aws_default_subnet.default_az1.id, aws_default_subnet.default_az2.id ]
     security_groups = [ aws_security_group.prod_web_SG.id ] # so that our instances & ELB can actually talk to each other & talk to the world
 
