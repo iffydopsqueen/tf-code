@@ -17,3 +17,4 @@ Identity and Access Management (IAM) is essential with Terraform so that accesse
 ### How to not INCUR charges 
 - `terraform plan -destroy` -  shows the resources that will be destroyed when you apply the `destroy` command
 - `terraform plan -destroy -out=destroy.plan` - saves the outcome of the `terraform plan -destroy` to a file called `destroy.plan` or whatever name you choose to call it.
+- `terraform apply` - used to apply your `destroy` changes
