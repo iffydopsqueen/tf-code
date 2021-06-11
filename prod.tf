@@ -1,4 +1,4 @@
-variable "whitelist" {
+variable "whitelist" { # should be more global so that employees can get to the dev, qa or prod if they are in the whitelist 
     type = list(string)
 }         
 variable "web_image_id" {
@@ -78,55 +78,15 @@ resource "aws_security_group" "prod_web_SG" {
     }
 }
 
-# Launch template for ASG
-resource "aws_launch_template" "prod_web_launch" {
-    name          = "prod-web-launch"
-    image_id      = var.web_image_id
-    instance_type = var.web_instance_type
-
-    tags = {
-        "Terraform" : "true"
-    }
-}
-
-# Auto-scaling group
-resource "aws_autoscaling_group" "prod_web_ASG" {
-    # availability_zones = [ "us-west-2c", "us-west-2d"] # use this one or the vpc_zone_identifier
-    desired_capacity    = var.web_desired_capacity
-    max_size            = var.web_max_size
-    min_size            = var.web_min_size
-    vpc_zone_identifier = [ aws_default_subnet.default_az1.id, aws_default_subnet.default_az2.id ]
-
-    launch_template {
-      id      = aws_launch_template.prod_web_launch.id
-      version = "$Latest"
-    }
+module "web_app" {
+    source = "./modules/web_app"
     
-    tag {
-        key                 = "Terraform" 
-        value               = "true"
-        propagate_at_launch = true
-    }
-}
-
-resource "aws_autoscaling_attachment" "prod_web_ASG_attach" {
-  autoscaling_group_name = aws_autoscaling_group.prod_web_ASG.id
-  elb                    = aws_elb.prod_web_ELB.id
-}
-
-resource "aws_elb" "prod_web_ELB" {
-    name            = "prod-web-ELB"
-    subnets         = [ aws_default_subnet.default_az1.id, aws_default_subnet.default_az2.id ]
-    security_groups = [ aws_security_group.prod_web_SG.id ] # so that our instances & ELB can actually talk to each other & talk to the world
-
-    listener {
-      instance_port     = 80
-      instance_protocol = "http"
-      lb_port           = 80
-      lb_protocol       = "http"
-    }
-
-    tags = {
-        "Terraform" : "true"
-    }
+    web_image_id = var.web_image_id
+    web_instance_type = var.web_instance_type
+    web_desired_capacity = var.web_desired_capacity
+    web_max_size = var.web_max_size
+    web_min_size = var.web_min_size
+    subnets = [ aws_default_subnet.default_az1.id, aws_default_subnet.default_az2.id ]
+    security_groups = [ aws_security_group.prod_web_SG.id ]
+    web_app = "prod"
 }
